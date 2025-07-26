@@ -1,5 +1,0 @@
-include:
-  - project: 'devops/helm-chart'
-    ref: 'main'
-    file:
-      - 'projects/erm/devops/templates/general/.template_default.yml'
