@@ -15,9 +15,7 @@ namespace Core.Helper.IService
         Task<bool> AddAsync(T item);
         Task<bool> DeleteAsync(T item);
         Task<bool> UpdateAsync(T item);
-        Task<List<T>> GetAsyncSchema(Expression<Func<T, bool>> expression, DateTime? filterFromDate, DateTime? filterToDate, string? includes = null);
-        Task<(List<T>, long)> GetAsyncSchema(Expression<Func<T, bool>> expression, List<OrderByInfo> orders, DateTime? filterFromDate, DateTime? filterToDate,
-            int pageSize = 20, int pageIndex = 1, string? includes = null);
+      
 
     }
     public class OrderByInfo

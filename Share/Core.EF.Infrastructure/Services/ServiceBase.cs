@@ -1,33 +1,28 @@
-﻿using System.Linq.Expressions;
-using LinqToDB;
-using LinqToDB.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
-using Core.Helper.Extend;
-using Core.Helper.IService;
-using Core.EF.Infrastructure.Database;
+﻿using Core.EF.Infrastructure.Database;
 using Core.EF.Infrastructure.Extensions;
 using Core.EF.Infrastructure.Repository;
+using Core.Helper.Extend;
+using Core.Helper.IOC;
+using Core.Helper.IService;
+using Core.Helper.Model;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
+using Microsoft.EntityFrameworkCore.Storage;
+using System.Linq.Expressions;
 
 namespace Core.EF.Infrastructure.Services
 {
-    public class ServiceBase<T> : Core.EF.Infrastructure.Services.IServiceBase<T> where T : class
+    public class ServiceBase<T> : IServiceBase<T> where T : class
     {
-        public ServiceBase(AppDbContext context)
+        IApplicationContext _applicationContext;
+        public ServiceBase(AppDbContext context,IApplicationContext applicationContext)
         {
-            Repository = new RepositoryBase<T>(context);
+            _applicationContext=applicationContext;
+            Repository = new RepositoryBase<T>(context, _applicationContext);
         }
         public async Task<(bool, Exception?)> TransactionUsing(Func<IDbContextTransaction?, Task> action)
         {
             return await Repository.TransactionUsing(action);
-        }
-        public ITable<T> Table(string schema)
-        {
-            return Repository.DbContext.Set<T>().ToLinqToDBTable().SchemaName(schema);
-        }
-        public ITable<T> Table()
-        {
-            return Repository.DbContext.Set<T>().ToLinqToDBTable();
         }
 
         
@@ -46,35 +41,62 @@ namespace Core.EF.Infrastructure.Services
             {
                 return null;
             }
-            return await Repository.Queryable().Where(exp!).IncludeMultiple(LinqIncludeExtensions.GetForeignKeyPaths(typeof(T)).ToArray()).AsSplitQuery().FirstAsyncEF();
+            return await Repository.Queryable().Where(exp!).IncludeMultiple(LinqIncludeExtensions.GetForeignKeyPaths(typeof(T)).ToArray()).AsSplitQuery().FirstAsync();
 
         }
 
         public async Task<List<T>> GetAsync()
-        {
-            return await Repository.Get();
+        {       
+            Expression<Func<T, bool>> expression= x => true;
+            if (typeof(ICompanyBaseEntity).IsAssignableFrom(typeof(T)) && _applicationContext.CompanyID!=null)
+            {
+                var pe = expression.Parameters[0];
+                var _expression = Expression.AndAlso(expression.Body,
+                    Expression.Equal(Expression.Property(pe, "CompanyID"), Expression.Constant(_applicationContext.CompanyID)));
+                expression = expression.Update(_expression, expression.Parameters);
+            }
+            return await Repository.Get(expression);
         }
 
         public async Task<List<T>> GetAsync(Expression<Func<T, bool>> expression, string? includes = null)
         {
+            if (typeof(ICompanyBaseEntity).IsAssignableFrom(typeof(T)) && _applicationContext.CompanyID!=null)
+            {
+                var pe = expression.Parameters[0];
+                var _expression = Expression.AndAlso(expression.Body,
+                    Expression.Equal(Expression.Property(pe, "CompanyID"), Expression.Constant(_applicationContext.CompanyID)));
+                expression = expression.Update(_expression, expression.Parameters);
+            }
             return await Repository.Get(expression, includes);
         }
 
-        public Task<(List<T>, long)> GetAsync(Expression<Func<T, bool>> expression, List<OrderByInfo> orders, int pageSize = 20, int pageIndex = 1)
+        public async Task<(List<T>, long)> GetAsync(Expression<Func<T, bool>> expression, List<OrderByInfo> orders, int pageSize = 20, int pageIndex = 1)
         {
-            throw new NotImplementedException();
+           
+            return await GetAsync(expression, orders, pageSize, pageIndex);
         }
 
         public async Task<(Task<List<T>>, Task<long>)> GetAsync(Expression<Func<T, bool>> expression,
             List<OrderByInfo> orders, int pageSize = 20, int pageIndex = 1, string? includes = null)
         {
-
+            if (typeof(ICompanyBaseEntity).IsAssignableFrom(typeof(T)) && _applicationContext.CompanyID!=null)
+            {
+                var pe = expression.Parameters[0];
+                var _expression = Expression.AndAlso(expression.Body,
+                    Expression.Equal(Expression.Property(pe, "CompanyID"), Expression.Constant(_applicationContext.CompanyID)));
+                expression = expression.Update(_expression, expression.Parameters);
+            }
             return await Repository.Get(expression, orders, pageSize, pageIndex,includes:includes);
 
         }
 
         public async Task<bool> AddAsync(T item)
         {
+            if (typeof(ICompanyBaseEntity).IsAssignableFrom(typeof(T)) && _applicationContext.CompanyID != null)
+            {
+                ((ICompanyBaseEntity)item).CompanyID = _applicationContext.CompanyID;
+
+            }
             return await Repository.Add(item);
         }
 
@@ -85,38 +107,44 @@ namespace Core.EF.Infrastructure.Services
 
         public async Task<bool> DeleteAsync(Expression<Func<T, bool>> expression)
         {
+            if (typeof(ICompanyBaseEntity).IsAssignableFrom(typeof(T)) && _applicationContext.CompanyID!=null)
+            {
+                var pe = expression.Parameters[0];
+                var _expression = Expression.AndAlso(expression.Body,
+                    Expression.Equal(Expression.Property(pe, "CompanyID"), Expression.Constant(_applicationContext.CompanyID)));
+                expression = expression.Update(_expression, expression.Parameters);
+            }
             return await Repository.Delete(expression);
         }
 
         public async Task<bool> UpdateAsync(T item)
         {
+            if (typeof(ICompanyBaseEntity).IsAssignableFrom(typeof(T))&& _applicationContext.CompanyID!=null)
+            {
+                ((ICompanyBaseEntity)item).CompanyID = _applicationContext.CompanyID;
 
+            }
             return await Repository.Update(item);
         }
 
-        public async Task<List<T>> GetAsyncSchema(Expression<Func<T, bool>> expression, DateTime? filterFromDate, DateTime? filterToDate, string? includes = null)
-        {
-
-            return await Repository.GetSchema(expression, filterFromDate, filterToDate, includes);
-        }
-
-        public async Task<(List<T>, long)?> GetAsyncSchema(Expression<Func<T, bool>> expression, List<OrderByInfo> orders, DateTime? filterFromDate, DateTime? filterToDate,
-            int pageSize = 20, int pageIndex = 1, string? includes = null)
-        {
-            var rs= await Repository.GetSchema(expression, orders, filterFromDate, filterToDate, pageSize, pageIndex, includes: includes);
-            await Task.WhenAll(rs.Item1, rs.Item2);
-            return (rs.Item1.Result, rs.Item2.Result);
-        }
-
+       
        
         
         public async Task<long> CountAsync(Expression<Func<T, bool>> expression)
         {
+            if (typeof(ICompanyBaseEntity).IsAssignableFrom(typeof(T))&& _applicationContext.CompanyID!=null)
+            {
+                var pe = expression.Parameters[0];
+                var _expression = Expression.AndAlso(expression.Body,
+                    Expression.Equal(Expression.Property(pe, "CompanyID"), Expression.Constant(_applicationContext.CompanyID)));
+                expression = expression.Update(_expression, expression.Parameters);
+            }
             return await Repository.Count(expression);
         }
        
         public async Task<List<T>> GetAsyncLinqToDB(Expression<Func<T, bool>> expression, string? includes = null)
         {
+            
             var state = Repository.DbContext.ChangeTracker.QueryTrackingBehavior;
             try
             {
@@ -131,34 +159,7 @@ namespace Core.EF.Infrastructure.Services
             finally
             {
                 Repository.DbContext.ChangeTracker.QueryTrackingBehavior = state;
-            }
-           /* List<T> rs = new List<T>();
-            if (includes == null)
-            {
-                var state = Repository.DbContext.ChangeTracker.QueryTrackingBehavior;
-                Repository.DbContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
-                rs = await Repository.DbContext.Set<T>().ToLinqToDBTable().AsNoTracking().Where(expression).LoadWithDynamic().ToListAsyncLinqToDB();
-                Repository.DbContext.ChangeTracker.QueryTrackingBehavior = state;
-            }
-            else
-            {
-                if (includes.IsNullOrWhiteSpace())
-                {
-                    var state = Repository.DbContext.ChangeTracker.QueryTrackingBehavior;
-                    Repository.DbContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
-                    rs = await Repository.DbContext.Set<T>().ToLinqToDBTable().AsNoTracking().Where(expression).ToListAsyncLinqToDB();
-                    Repository.DbContext.ChangeTracker.QueryTrackingBehavior = state;
-
-                }
-                else
-                {
-                    var state = Repository.DbContext.ChangeTracker.QueryTrackingBehavior;
-                    Repository.DbContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
-                    rs = await Repository.DbContext.Set<T>().ToLinqToDBTable().AsNoTracking().Where(expression).LoadWithDynamic(includes.Split(',').ToList()).ToListAsyncLinqToDB();
-                    Repository.DbContext.ChangeTracker.QueryTrackingBehavior = state;
-                }
-            }
-            return rs;*/
+            }          
         }
 
         public async Task<(List<T>, long)> GetAsyncLinqToDB(Expression<Func<T, bool>> expression, List<OrderByInfo> orders, int pageSize = 20, int pageIndex = 1,
@@ -174,29 +175,7 @@ namespace Core.EF.Infrastructure.Services
                     includes);
                await  Task.WhenAll(rs.Item1, rs.Item2);
                return (rs.Item1.Result, rs.Item2.Result);
-                /*if (includes == null)
-                {
-                    var tList = Repository.DbContext.Set<T>().ToLinqToDBTable().AsNoTracking().Where(expression).LoadWithDynamic().OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize)
-                        .ToListAsyncLinqToDB();
-
-                    return Task.FromResult((tList, tCount));
-                }
-                else
-                {
-                    if (includes.IsNullOrWhiteSpace())
-                    {
-                        var tList = Repository.DbContext.Set<T>().ToLinqToDBTable().AsNoTracking().Where(expression).OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize)
-                            .ToListAsyncLinqToDB();
-                        return Task.FromResult((tList, tCount));
-                    }
-                    else
-                    {
-                        var tList = Repository.DbContext.Set<T>().ToLinqToDBTable().AsNoTracking().Where(expression).LoadWithDynamic(includes.Split(',').ToList()).OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize)
-                           .ToListAsyncLinqToDB();
-                        return Task.FromResult((tList, tCount));
-                    }
-
-                }*/
+               
             }
             catch (Exception e)
             {
@@ -218,11 +197,6 @@ namespace Core.EF.Infrastructure.Services
            GC.WaitForPendingFinalizers();
         }
 
-        async Task<(List<T>, long)> IAsyncService<T>.GetAsyncSchema(Expression<Func<T, bool>> expression, List<OrderByInfo> orders, DateTime? filterFromDate, DateTime? filterToDate, int pageSize, int pageIndex, string? includes)
-        {
-            var rs = await Repository.GetSchema(expression, orders, filterFromDate, filterToDate, pageSize, pageIndex, includes: includes);
-            await Task.WhenAll(rs.Item1, rs.Item2);
-            return (rs.Item1.Result, rs.Item2.Result);
-        }
+     
     }
 }

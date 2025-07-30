@@ -21,8 +21,6 @@ namespace Core.Helper.IOC
         string? Phone { get; set; }
         string? Email { get; set; }
         string? ResetPasswordToken { get; set; }
-        DateTime? LastResetPasswordDate { get; set; }
-        Dictionary<string, string>? MappingObject { get; set; }
-        public string? GetMapping(string key);
+        DateTime? LastResetPasswordDate { get; set; }          
     }
 }

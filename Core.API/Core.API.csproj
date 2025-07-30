@@ -16,7 +16,7 @@
 	<ItemGroup>
 		<!-- Security & JWT -->
 		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-		<PackageReference Include="linq2db.EntityFrameworkCore" Version="7.7.0" />
+	
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.5" />
 
 		<!-- EF Core -->
@@ -28,6 +28,7 @@
 
 		<!-- OpenAPI / Swagger -->
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Identity.Core" Version="9.0.7" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
 
 		<!-- Serilog & Logging -->

@@ -1,5 +1,4 @@
 ﻿using System.Linq.Expressions;
-using LinqToDB;
 
 namespace Core.EF.Infrastructure.Extensions
 {
@@ -45,7 +44,7 @@ namespace Core.EF.Infrastructure.Extensions
             return dbSchemas != null && dbSchemas.Any(schema => schema.Equals(schemaName.ToUpper(), StringComparison.OrdinalIgnoreCase));
         }
 
-        public static IQueryable<T> LoadWithDynamic<T>(this IQueryable<T> query, List<string> navigationPaths)
+       /* public static IQueryable<T> LoadWithDynamic<T>(this IQueryable<T> query, List<string> navigationPaths)
             where T : class
         {
             foreach (var path in navigationPaths)
@@ -55,9 +54,9 @@ namespace Core.EF.Infrastructure.Extensions
             }
 
             return query;
-        }
+        }*/
 
-        private static IQueryable<T> ApplyLoadWithPath<T>(IQueryable<T> query, string[] properties) where T : class
+       /* private static IQueryable<T> ApplyLoadWithPath<T>(IQueryable<T> query, string[] properties) where T : class
         {
             Type currentType = typeof(T);
             Expression currentExpression = null;
@@ -110,16 +109,16 @@ namespace Core.EF.Infrastructure.Extensions
 
             return query;
         }
+       */
 
 
-
-
+        /*
         public static IQueryable<T> LoadWithDynamic<T>(this IQueryable<T> query) where T : class
         {
             var paths = LinqIncludeExtensions.GetForeignKeyPaths(typeof(T));
             return LoadWithDynamic(query, paths);
         }
-
+        */
        
     }
 

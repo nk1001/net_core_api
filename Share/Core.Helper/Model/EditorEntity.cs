@@ -18,23 +18,12 @@ namespace Core.Helper.Model
      
         public string? LastUpdateByName { get; set; }
        
-        public DateTime? LastUpdateDate { get; set; }
-        [NotMapped]
-        public ActionType? ActionType { get; set; }
+        public DateTime? LastUpdateDate { get; set; }      
     }
-    public enum ActionType
-    {
-        Create = 1,
-        Update = 2,
-        Delete = 3,
-        Design = 4,
-        Publish = 5,
-        Unattached = 6,
-        Continue = 7
-    }
+    
     public interface ICompanyBaseEntity
     {
-         int CompanyID { get; set; }
+         int? CompanyID { get; set; }
     }
   
     public interface ICaching

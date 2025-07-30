@@ -3,12 +3,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 using Core.Helper.Attribute;
 using Core.Helper.EFCore;
 using Core.Helper.IOC;
+using Core.Helper.Model;
 
 namespace Core.Entity.Model.Systems
 {
     [WebAuthorize("SysUser")]
     [Table("SysUser")]
-    public class SysUser :  DependencyEntityEfService<SysUser>, IUser
+    public class SysUser :  DependencyEntityEfService<SysUser>, IUser,  ICompanyBaseEntity
     {
         [Key]
         public string ID { get; set; }
@@ -28,15 +29,9 @@ namespace Core.Entity.Model.Systems
         public string? Phone { get; set; }
         public string? Email { get; set; }
         public string? ResetPasswordToken { get; set; }
-        public DateTime? LastResetPasswordDate { get; set; }
-        [NotMapped]
-
-        public Dictionary<string, string>? MappingObject { get; set; }
-        public string? GetMapping(string key)
-        {
-            throw new NotImplementedException();
-        }
+        public DateTime? LastResetPasswordDate { get; set; }      
         [EfJsonConvert]
         public List<string>? Roles { get; set; }
-    }
+        public int? CompanyID { get; set; }
+    }   
 }

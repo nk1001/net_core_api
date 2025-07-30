@@ -4,11 +4,9 @@ using Core.EF.Infrastructure.Services;
 using Core.EF.WebApi;
 using Core.EF.WebApi.Helper;
 using Core.Entity.Model.Systems;
+using Core.Helper.IOC;
 using Core.Helper.NetCore;
-using LinqToDB.Data;
-using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -111,13 +109,7 @@ builder.Services.AddSwaggerGen(options => {
 
 builder.Services.AddScoped<JwtService>();
 
-//EF Core Config DBContext
-LinqToDBForEFTools.Initialize();
-DataConnection.TurnTraceSwitchOn();
-DataConnection.WriteTraceLine = (s1, s2, s3) =>
-{
-    Console.WriteLine(s1, s2);
-};
+
 
 builder.Services.AddDbContextPool<AppDbContext>((serviceProvider, options) =>
 {
@@ -131,7 +123,7 @@ builder.Services.AddDbContextPool<AppDbContext>((serviceProvider, options) =>
         warnings.Ignore(CoreEventId.DetachedLazyLoadingWarning));
   
  
-    options.UseLinqToDB();
+  
     options.LogTo(message => Debug.WriteLine(message));   
     options.UseLazyLoadingProxies();
     options.ConfigureWarnings(warnings => warnings.Ignore(SqlServerEventId.DecimalTypeDefaultWarning));
@@ -152,6 +144,7 @@ builder.Services.AddCors(options =>
                           policy.AllowAnyMethod().AllowAnyHeader().AllowAnyOrigin();
                       });
 });
+builder.Services.AddScoped<IApplicationContext, ApplicationContext>();
 //EF Core Config Service
 builder.Services.AddApiServiceCore(typeof(IServiceBase<>), typeof(ServiceBase<>));
 

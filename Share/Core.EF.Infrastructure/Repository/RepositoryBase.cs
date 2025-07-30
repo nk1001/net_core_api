@@ -1,23 +1,23 @@
-﻿using System.Linq.Expressions;
+﻿using Core.EF.Infrastructure.Database;
+using Core.EF.Infrastructure.Extensions;
+using Core.Helper.Extend;
+using Core.Helper.IOC;
+using Core.Helper.IService;
+using Core.Helper.Model;
 using EFCoreSecondLevelCacheInterceptor;
-using LinqToDB;
-using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Core.Helper.Extend;
-using Core.Helper.IService;
-using Core.EF.Infrastructure.Database;
-using Core.EF.Infrastructure.Extensions;
+using System.Linq.Expressions;
 
 namespace Core.EF.Infrastructure.Repository
 {
     internal class RepositoryBase<T> :IRepository<T>,IAsyncDisposable where T : class
     {
-     
-        public RepositoryBase(AppDbContext dbContext)
+        IApplicationContext _applicationContext;
+        public RepositoryBase(AppDbContext dbContext, IApplicationContext applicationContext)
         {
             DbContext = dbContext;
-        
+            _applicationContext=applicationContext;
 
         }
 
@@ -76,7 +76,15 @@ namespace Core.EF.Infrastructure.Repository
 
         public async Task<List<T>> Get()
         {
-            return await DbContext.Set<T>().AsNoTracking().ToListAsyncEF();
+            Expression<Func<T, bool>> expression = x => true;
+            if (typeof(ICompanyBaseEntity).IsAssignableFrom(typeof(T)) && _applicationContext.CompanyID!=null)
+            {
+                var pe = expression.Parameters[0];
+                var _expression = Expression.AndAlso(expression.Body,
+                    Expression.Equal(Expression.Property(pe, "CompanyID"), Expression.Constant(_applicationContext.CompanyID)));
+                expression = expression.Update(_expression, expression.Parameters);
+            }
+            return await DbContext.Set<T>().AsNoTracking().Where(expression).ToListAsync();
         }
 
         public async Task<List<T>> Get(Expression<Func<T, bool>> expression, string? includes = null)
@@ -84,17 +92,17 @@ namespace Core.EF.Infrastructure.Repository
            
             if (includes == null)
             {
-                return await DbContext.Set<T>().AsNoTracking().Where(expression).Cacheable(CacheExpirationMode.Sliding, TimeSpan.FromMinutes(5)).AsSplitQuery().ToListAsyncEF();
+                return await DbContext.Set<T>().AsNoTracking().Where(expression).Cacheable(CacheExpirationMode.Sliding, TimeSpan.FromMinutes(5)).AsSplitQuery().ToListAsync();
             }
             else
             {
                 if (includes.IsNullOrWhiteSpace())
                 {
-                    return await DbContext.Set<T>().AsNoTracking().Where(expression).Cacheable(CacheExpirationMode.Sliding, TimeSpan.FromMinutes(5)).AsSplitQuery().ToListAsyncEF();
+                    return await DbContext.Set<T>().AsNoTracking().Where(expression).Cacheable(CacheExpirationMode.Sliding, TimeSpan.FromMinutes(5)).AsSplitQuery().ToListAsync();
                 }
                 else
                 {
-                    return await DbContext.Set<T>().AsNoTracking().Where(expression).IncludeMultiple(includes.Split(',')).Cacheable(CacheExpirationMode.Sliding, TimeSpan.FromMinutes(5)).AsSplitQuery().ToListAsyncEF();
+                    return await DbContext.Set<T>().AsNoTracking().Where(expression).IncludeMultiple(includes.Split(',')).Cacheable(CacheExpirationMode.Sliding, TimeSpan.FromMinutes(5)).AsSplitQuery().ToListAsync();
                 }
             }
 
@@ -109,7 +117,7 @@ namespace Core.EF.Infrastructure.Repository
             if (includes == null)
             {
                 var tList = DbContext.Set<T>().AsNoTracking().Where(expression).OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize)
-                    .AsSplitQuery().ToListAsyncEF();
+                    .AsSplitQuery().ToListAsync();
                 return Task.FromResult((tList, tCount));
             }
             else
@@ -117,13 +125,13 @@ namespace Core.EF.Infrastructure.Repository
                 if (includes.IsNullOrWhiteSpace())
                 {
                     var tList = DbContext.Set<T>().AsNoTracking().Where(expression).OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize)
-                        .AsSplitQuery().ToListAsyncEF();
+                        .AsSplitQuery().ToListAsync();
                     return Task.FromResult((tList, tCount));
                 }
                 else
                 {
                     var tList = DbContext.Set<T>().AsNoTracking().Where(expression).IncludeMultiple(includes.Split(',')).OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize)
-                        .AsSplitQuery().ToListAsyncEF();
+                        .AsSplitQuery().ToListAsync();
                     return Task.FromResult((tList, tCount));
                 }
 
@@ -162,7 +170,7 @@ namespace Core.EF.Infrastructure.Repository
 
                 var includes= LinqIncludeExtensions.GetForeignKeyPaths(typeof(T)).ToArray();
                 var _oldItem = await DbContext.Set<T>().Where(ex).IncludeMultiple(includes)
-                    .FirstAsyncEF();
+                    .FirstAsync();
                // var _oldItem = await DbContext.FindAsync<T>(GetKey(item));
 
                 new ProxyObjectMergeOpt().MergeProp(ref _oldItem, item);
@@ -180,112 +188,10 @@ namespace Core.EF.Infrastructure.Repository
         public async Task<long> Count(Expression<Func<T, bool>> expression)
         {
 
-            return  await DbContext.Set<T>().AsNoTracking().AsQueryable().LongCountAsyncEF(expression);
+            return  await DbContext.Set<T>().AsNoTracking().AsQueryable().LongCountAsync(expression);
 
         }
-        public async Task<long> Count(Expression<Func<T, bool>> expression, string[] listSchemas)
-        {
-            List<IQueryable<T>> list = new List<IQueryable<T>>();
-            foreach (var schema in listSchemas)
-            {
-                list.Add(DbContext.Set<T>().ToLinqToDBTable().SchemaName(schema).AsNoTracking().Where(expression));
-            }
-
-            return await list.Aggregate((c, n) => c.UnionAll(n)).LongCountAsyncLinqToDB();
-
-        }
-        public async Task<List<T>> GetSchema(Expression<Func<T, bool>> expression, DateTime? filterFromDate, DateTime? filterToDate, string? includes = null)
-        {
-            var lstSchemas = await DbContext.GetDatabaseSchema("HSOFTTAMANH");
-            var listSchemas = Linq2dbLoadWithExtensions.GetDataMmyy(filterFromDate!.Value, filterToDate!.Value, false, lstSchemas);
-           
-            if (includes == null)
-            {
-                List<IQueryable<T>> list = new List<IQueryable<T>>();
-                foreach (var schema in listSchemas)
-                {
-                    list.Add(DbContext.Set<T>().ToLinqToDBTable().SchemaName(schema).AsNoTracking().Where(expression)); 
-                }
-
-                return (await list.Aggregate((c, n) => c.UnionAll(n)).ToListAsyncLinqToDB());
-            }
-            else
-            {
-                if (includes.IsNullOrWhiteSpace())
-                {
-                    List<IQueryable<T>> list = new List<IQueryable<T>>();
-                    foreach (var schema in listSchemas)
-                    {
-                        list.Add(DbContext.Set<T>().ToLinqToDBTable().SchemaName(schema).AsNoTracking().Where(expression));
-                    }
-
-                    return (await list.Aggregate((c, n) => c.UnionAll(n)).ToListAsyncLinqToDB());
-                }
-                else
-                {
-                    List<IQueryable<T>> list = new List<IQueryable<T>>();
-                    foreach (var schema in listSchemas)
-                    {
-                        list.Add(DbContext.Set<T>().ToLinqToDBTable().SchemaName(schema).AsNoTracking().Where(expression).IncludeMultiple(includes.Split(',')));
-                    }
-
-                    return (await list.Aggregate((c, n) => c.UnionAll(n)).ToListAsyncLinqToDB());
-                }
-            }
-
-        }
-
-        public async Task<(Task<List<T>>, Task<long>)> GetSchema(Expression<Func<T, bool>> expression, List<OrderByInfo> orders, DateTime? filterFromDate, DateTime? filterToDate, int pageSize = 20,
-            int pageIndex = 1, string? includes = null)
-        {
-            var lstSchemas = await DbContext.GetDatabaseSchema("HSOFTTAMANH");
-            var listSchemas = Linq2dbLoadWithExtensions.GetDataMmyy(filterFromDate!.Value, filterToDate!.Value, false, lstSchemas);
-            var tCount = Count(expression, listSchemas.ToArray());
-            if (includes == null)
-            {
-                List<IQueryable<T>> list = new List<IQueryable<T>>();
-                foreach (var schema in listSchemas)
-                {
-                    list.Add(DbContext.Set<T>().ToLinqToDBTable().SchemaName(schema).AsNoTracking().Where(expression));
-                }
-
-                var rs= list.Aggregate((c, n) => c.UnionAll(n));
-                
-                return  await Task.FromResult((rs.OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsyncLinqToDB(), tCount));
-             
-
-            }
-            else
-            {
-                if (includes.IsNullOrWhiteSpace())
-                {
-                    List<IQueryable<T>> list = new List<IQueryable<T>>();
-                    foreach (var schema in listSchemas)
-                    {
-                        list.Add(DbContext.Set<T>().ToLinqToDBTable().SchemaName(schema).AsNoTracking().Where(expression));
-                    }
-
-                    var rs = list.Aggregate((c, n) => c.UnionAll(n));
-
-                    return await Task.FromResult((rs.OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsyncLinqToDB(), tCount));
-                }
-                else
-                {
-                    List<IQueryable<T>> list = new List<IQueryable<T>>();
-                    foreach (var schema in listSchemas)
-                    {
-                        list.Add(DbContext.Set<T>().ToLinqToDBTable().SchemaName(schema).AsNoTracking().Where(expression).IncludeMultiple(includes.Split(',')));
-                    }
-
-                    var rs = list.Aggregate((c, n) => c.UnionAll(n));
-
-                    return await Task.FromResult((rs.OrderBy(orders).Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsyncLinqToDB(), tCount));
-              
-                }
-
-            }
-        }
-
+      
         public async ValueTask DisposeAsync()
         {
 

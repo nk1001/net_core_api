@@ -2,12 +2,13 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using Core.Helper.Attribute;
 using Core.Helper.IOC;
+using Core.Helper.Model;
 
 namespace Core.Entity.Model.Systems
 {
     [WebAuthorize("SysRole")]
     [Table("SysRole")]
-    public class SysRole : DependencyEntityEfService<SysRole>, IHasId
+    public class SysRole : DependencyEntityEfService<SysRole>, IHasId,ICompanyBaseEntity
     {
         [Key]
         public string ID { get; set; }
@@ -17,7 +18,6 @@ namespace Core.Entity.Model.Systems
         public virtual List<SysRoleMenuAction>? Actions { get; set; } = new();
         [NotMapped]
         public virtual List<SysUserRole>? Users { get; set; } = new();
-      
-
+        public int? CompanyID { get; set; }
     }
 }

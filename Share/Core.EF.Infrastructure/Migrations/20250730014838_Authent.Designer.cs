@@ -4,6 +4,7 @@ using Core.EF.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Core.EF.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250730014838_Authent")]
+    partial class Authent
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,9 +32,6 @@ namespace Core.EF.Infrastructure.Migrations
                 {
                     b.Property<string>("ID")
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<int?>("CompanyID")
-                        .HasColumnType("int");
 
                     b.Property<long?>("Count")
                         .HasColumnType("bigint");
@@ -72,9 +72,6 @@ namespace Core.EF.Infrastructure.Migrations
                 {
                     b.Property<string>("ID")
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<int?>("CompanyID")
-                        .HasColumnType("int");
 
                     b.Property<string>("CreateBy")
                         .HasColumnType("nvarchar(max)");
@@ -138,9 +135,6 @@ namespace Core.EF.Infrastructure.Migrations
                     b.Property<string>("ActionName")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("CompanyID")
-                        .HasColumnType("int");
-
                     b.Property<string>("CreateBy")
                         .HasColumnType("nvarchar(max)");
 
@@ -179,9 +173,6 @@ namespace Core.EF.Infrastructure.Migrations
                 {
                     b.Property<string>("ID")
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<int?>("CompanyID")
-                        .HasColumnType("int");
 
                     b.Property<string>("CreateBy")
                         .HasColumnType("nvarchar(max)");
@@ -225,9 +216,6 @@ namespace Core.EF.Infrastructure.Migrations
                     b.Property<string>("ID")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<int?>("CompanyID")
-                        .HasColumnType("int");
-
                     b.Property<string>("CreateBy")
                         .HasColumnType("nvarchar(max)");
 
@@ -270,9 +258,6 @@ namespace Core.EF.Infrastructure.Migrations
 
                     b.Property<string>("ActionName")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("CompanyID")
-                        .HasColumnType("int");
 
                     b.Property<string>("CreateBy")
                         .HasColumnType("nvarchar(max)");
@@ -324,9 +309,6 @@ namespace Core.EF.Infrastructure.Migrations
 
                     b.Property<DateTime?>("Birthday")
                         .HasColumnType("datetime2");
-
-                    b.Property<int?>("CompanyID")
-                        .HasColumnType("int");
 
                     b.Property<string>("CreateBy")
                         .HasColumnType("nvarchar(max)");
@@ -407,9 +389,6 @@ namespace Core.EF.Infrastructure.Migrations
                 {
                     b.Property<string>("ID")
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<int?>("CompanyID")
-                        .HasColumnType("int");
 
                     b.Property<string>("CreateBy")
                         .HasColumnType("nvarchar(max)");

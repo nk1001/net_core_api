@@ -22,9 +22,6 @@ namespace Core.EF.Infrastructure.Repository
         Task<bool> Update(T item);
         Task<long> Count(Expression<Func<T, bool>> expression);
 
-        Task<List<T>> GetSchema(Expression<Func<T, bool>> expression, DateTime? filterFromDate, DateTime? filterToDate, string? includes = null);
-        Task<(Task<List<T>>, Task<long>)> GetSchema(Expression<Func<T, bool>> expression, List<OrderByInfo> orders, DateTime? filterFromDate, DateTime? filterToDate,
-            int pageSize = 20, int pageIndex = 1, string? includes = null);
 
     }
 }

@@ -1,21 +1,24 @@
-﻿using System.ComponentModel;
-using System.Linq.Dynamic.Core;
-using System.Linq.Expressions;
-using LinqToDB.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
+﻿using Core.EF.Infrastructure.Extensions;
+using Core.EF.WebApi.Authorize;
+using Core.EF.WebApi.Helper;
+using Core.Helper.APIMessage;
+using Core.Helper.Extend;
+using Core.Helper.IOC;
+using Core.Helper.IService;
+using Core.Helper.Model;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
-using Core.Helper.APIMessage;
-using Core.Helper.Extend;
-using Core.Helper.IService;
-using Core.EF.Infrastructure.Extensions;
-using Core.EF.WebApi.Helper;
+using System.ComponentModel;
+using System.Linq.Dynamic.Core;
+using System.Linq.Expressions;
+using System.Runtime.ConstrainedExecution;
+using AuthorizeAttribute = Core.EF.WebApi.Authorize.AuthorizeAttribute;
 
 namespace Core.EF.WebApi.Controllers
 {
 
-    [Authorize]
+    [Authorize(key: "*")]
     [Route("api/[controller]",Order = 99)]
     [ApiController]
     public abstract class BaseApiController<TEntity> : ControllerBase where TEntity : class
@@ -34,6 +37,7 @@ namespace Core.EF.WebApi.Controllers
         /// <param name="filter"></param>
         /// <returns></returns>
         [HttpPost("Filter")]
+        [Authorize(action: "View")]
         [ProducesDefaultResponseType(typeof(MessageResponse<>))]
         public virtual async Task<IActionResult> Filter(FilterMessage filter)
         {
@@ -128,6 +132,8 @@ namespace Core.EF.WebApi.Controllers
         /// <param name="filter"></param>
         /// <returns></returns>
         [HttpPost("FilterLinq")]
+        [InternalRequest]
+        [Authorize(action: "*", key: "*")]
         [ProducesDefaultResponseType(typeof(MessageResponse<>))]
         public virtual async Task<IActionResult> FilterLinq(LinqFilterMessage filter)
         {
@@ -201,12 +207,10 @@ namespace Core.EF.WebApi.Controllers
                 if (filter.PageSize == int.MaxValue)
                 {
                     List<TEntity> rs;
-                    if (filter.FromDate != null && filter.ToDate!=null)
+                    rs = await IService.GetAsync(all, includes: filter.Includes);
+                    if (filter.OrderBy != null && filter.OrderByMethod != null)
                     {
-                        rs = await IService.GetAsyncSchema(all, filter.FromDate, filter.ToDate, includes: filter.Includes);
-                        if (filter.OrderBy != null && filter.OrderByMethod != null)
-                        {
-                            rs = rs.AsQueryable().OrderBy(new List<OrderByInfo>()
+                        rs = rs.AsQueryable().OrderBy(new List<OrderByInfo>()
                             {
                                 new()
                                 {
@@ -218,28 +222,8 @@ namespace Core.EF.WebApi.Controllers
 
                                 }
                             }).ToList();
-                        }
                     }
-                    else
-                    {
-                        rs = await IService.GetAsyncLinqToDB(all, includes: filter.Includes);
-                        if (filter.OrderBy != null && filter.OrderByMethod != null)
-                        {
-                            rs = rs.AsQueryable().OrderBy(new List<OrderByInfo>()
-                            {
-                                new()
-                                {
-                                    Initial = true,
-                                    PropertyName = filter.OrderBy,
-                                    Direction = filter.OrderByMethod == "Descending"
-                                        ? SortDirection.Descending
-                                        : SortDirection.Ascending,
 
-                                }
-                            }).ToList();
-                        }
-                    }
-                    
                     return Ok(
                         new MessageResponse<FilterLinqMessageResponse<TEntity>>
                         {
@@ -252,7 +236,7 @@ namespace Core.EF.WebApi.Controllers
                     if (filter.FromDate!=null && filter.ToDate!=null)
                     {
 
-                        rs = await IService.GetAsyncSchema(all, new List<OrderByInfo>()
+                        rs = await IService.GetAsync(all, new List<OrderByInfo>()
                         {
                             new()
 
@@ -264,20 +248,20 @@ namespace Core.EF.WebApi.Controllers
                                     : SortDirection.Ascending,
 
                             }
-                        }, filter.FromDate, filter.ToDate, filter.PageSize, filter.PageIndex,filter.Includes);
+                        },  filter.PageSize, filter.PageIndex/*,filter.Includes*/);
 
 
                     }
                     else
                     {
-                        rs = await IService.GetAsyncLinqToDB(all, new List<OrderByInfo>(){new()
+                        rs = await IService.GetAsync(all, new List<OrderByInfo>(){new()
 
                         {
                             Initial = true,
                             PropertyName = filter.OrderBy,
                             Direction = filter.OrderByMethod=="Descending"?SortDirection.Descending:SortDirection.Ascending,
 
-                        }}, filter.PageSize, filter.PageIndex, includes: filter.Includes);
+                        }}, filter.PageSize, filter.PageIndex/*, includes: filter.Includes*/);
 
                     }
                     
@@ -316,6 +300,7 @@ namespace Core.EF.WebApi.Controllers
        
         
         [HttpGet()]
+        [Authorize(action: "View")]
         [ProducesDefaultResponseType(typeof(MessageResponse<>))]
         public virtual async Task<IActionResult> Get(string id)
         {
@@ -334,11 +319,8 @@ namespace Core.EF.WebApi.Controllers
                 }
                 var state = IService.Repository.DbContext.ChangeTracker.QueryTrackingBehavior;
                 IService.Repository.DbContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
-                var rs = await IService.Repository.DbContext.Set<TEntity>().ToLinqToDBTable().AsNoTracking().Where(exp).LoadWithDynamic().FirstOrDefaultAsyncLinqToDB();
+                var rs = await IService.Repository.DbContext.Set<TEntity>().AsNoTracking().Where(exp).FirstOrDefaultAsync();
                 IService.Repository.DbContext.ChangeTracker.QueryTrackingBehavior = state;
-
-
-               // var rs = await IService.FindAsync(id);
                 if (rs == null)
                 {
                     return Ok(new MessageResponse<TEntity>
@@ -370,14 +352,23 @@ namespace Core.EF.WebApi.Controllers
         /// <param name="entity"></param>
         /// <returns></returns>
         [HttpPost]
+        [Authorize(action: "Create")]
         [ProducesDefaultResponseType(typeof(MessageResponse<>))]
         public virtual async Task<IActionResult> Post([FromBody] TEntity entity)
         {
             try
             {
+               
                 if (ModelState.IsValid)
                 {
-
+                    var cUser = await ServiceLocator.GetService<IApplicationContext>()!.CurrentUser();
+                    if (entity is EditorEntity editorEntity)
+                    {
+                        editorEntity.CreateDate = DateTime.Now;
+                        editorEntity.CreatebyName = cUser?.NickName;
+                        editorEntity.CreateBy = cUser?.UserName;
+                        editorEntity.Status = 1;
+                    }                     
                     var rs = await IService.AddAsync(entity);
                     if (rs)
                     {
@@ -430,12 +421,21 @@ namespace Core.EF.WebApi.Controllers
         /// <returns></returns>
         [HttpPut]
         [ProducesDefaultResponseType(typeof(MessageResponse<>))]
+        [Authorize(action: "Edit")]
         public virtual async Task<IActionResult> Put([FromBody] TEntity entity)
         {
             try
             {
+              
                 if (ModelState.IsValid)
                 {
+                    var cUser = await ServiceLocator.GetService<IApplicationContext>()!.CurrentUser();
+                    if (entity is EditorEntity editorEntity)
+                    {
+                        editorEntity.LastUpdateDate = DateTime.Now;
+                        editorEntity.LastUpdateByName = cUser?.NickName;
+                        editorEntity.LastUpdateBy = cUser?.UserName;                      
+                    }
                     var isUpdate = await IService.UpdateAsync(entity);
                     if (isUpdate)
                     {
@@ -484,12 +484,20 @@ namespace Core.EF.WebApi.Controllers
         /// <param name="id"></param>
         /// <returns></returns>
         [HttpDelete()]
+        [Authorize(action: "Delete")]
         [ProducesDefaultResponseType(typeof(MessageResponse<>))]
         public virtual async Task<IActionResult> Delete(string id)
         {
             var obj=await IService.FindAsync(id);
             if (obj!=null)
             {
+                var cUser = await ServiceLocator.GetService<IApplicationContext>()!.CurrentUser();
+                if (obj is EditorEntity editorEntity)
+                {
+                    editorEntity.LastUpdateDate = DateTime.Now;
+                    editorEntity.LastUpdateByName = cUser?.NickName;
+                    editorEntity.LastUpdateBy = cUser?.UserName;
+                }
                 var rs = false;
                 try
                 {

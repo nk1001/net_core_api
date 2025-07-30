@@ -4,6 +4,11 @@ using Core.Helper.Model;
 
 namespace Core.Helper.IOC
 {
+    public interface IApplicationContext
+    {
+        int? CompanyID { get; set; }
+        Task<IUser?> CurrentUser();
+    }
     public interface IDependencyService
     {
 

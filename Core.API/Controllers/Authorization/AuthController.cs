@@ -1,10 +1,15 @@
-﻿using Core.EF.Infrastructure.Database;
+﻿using System.Security.Claims;
+using Core.EF.Infrastructure.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Core.Entity.Model.Systems;
 using Core.API.Models;
 using Core.API.Security;
+using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations; // For PasswordHasher
+using Microsoft.AspNetCore.Http; // Add this at the top if not present
+using System.IO; // For file operations
 
 namespace Core.API.Controllers.Authorization
 {
@@ -106,17 +111,74 @@ namespace Core.API.Controllers.Authorization
 
             return Ok(new { message = "Logged out successfully" });
         }
+ 
+        
 
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
+            var user = await _dbContext.Set<SysUser>().FirstOrDefaultAsync(u => u.UserName == request.UsernameOrEmail || u.Email == request.UsernameOrEmail);
+            if (user == null)
+                return NotFound(new { message = "If the account exists, a reset token has been sent." }); // Do not reveal user existence
 
-        [NonAction]
-        [HttpPost("signature")]
-        [Authorize]
-        public async Task<IActionResult> Signature([FromBody] SignatureRequest request)
-        {          
+            // Generate a reset token (GUID)
+            user.ResetPasswordToken = Guid.NewGuid().ToString("N");
+            user.LastResetPasswordDate = DateTime.UtcNow;
 
-            return Ok(new { data = Core.Helper.Helper.SignatureHelper.GenerateSignature(request.SignatureBody,request.SignatureKey) });
+            _dbContext.Set<SysUser>().Update(user);
+            await _dbContext.SaveChangesAsync();
+
+            // TODO: Send the token to user's email (implement email sending as needed)
+            // Example: await _emailService.SendResetPasswordEmail(user.Email, user.ResetPasswordToken);
+
+            return Ok(new { message = "If the account exists, a reset token has been sent." });
         }
 
+        [HttpPost("reset-password-with-token")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPasswordWithToken([FromBody] ResetPasswordWithTokenRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = await _dbContext.Set<SysUser>().FirstOrDefaultAsync(u => u.ResetPasswordToken == request.Token);
+            if (user == null)
+                return BadRequest(new { message = "Invalid or expired reset token." });
+
+            // Optionally, check token expiration (e.g., valid for 30 minutes)
+            if (user.LastResetPasswordDate != null && user.LastResetPasswordDate.Value.AddMinutes(30) < DateTime.UtcNow)
+                return BadRequest(new { message = "Reset token has expired." });
+
+            var hasher = new PasswordHasher<SysUser>();
+            user.PassWord = hasher.HashPassword(user, request.NewPassword);
+            user.ResetPasswordToken = null;
+            user.LastResetPasswordDate = DateTime.UtcNow;
+
+            _dbContext.Set<SysUser>().Update(user);
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(new { message = "Password has been reset successfully." });
+        }
+
+           
+        public class ForgotPasswordRequest
+        {
+            [Required]
+            public string UsernameOrEmail { get; set; }
+        }
+
+        public class ResetPasswordWithTokenRequest
+        {
+            [Required]
+            public string Token { get; set; }
+            [Required]
+            public string NewPassword { get; set; }
+        }
+
+        
     }
 }

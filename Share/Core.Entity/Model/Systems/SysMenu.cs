@@ -3,14 +3,15 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Core.Helper.Attribute;
 using Core.Helper.IOC;
+using Core.Helper.Model;
 
 namespace Core.Entity.Model.Systems
 {
     [WebAuthorize("SysMenu")]
     [Table("SysMenu")]
-    public class SysMenu: DependencyEntityEfService<SysMenu>, IHasId
+    public class SysMenu : DependencyEntityEfService<SysMenu>, IHasId, ICompanyBaseEntity
     {
-     
+
         [Key]
         public string ID { get; set; }
         [Required]
@@ -22,9 +23,10 @@ namespace Core.Entity.Model.Systems
         public string? MenuIcon { get; set; }
         public int? MenuIndex { get; set; }
         [ForeignKey("MenuId")]
-        public virtual List<SysMenuAction>? Actions { get; set; }=new();
+        public virtual List<SysMenuAction>? Actions { get; set; } = new();
         public string? ParentId { get; set; }
         [ForeignKey("ParentId")]
         public virtual List<SysMenu>? Childrens { get; set; }
+        public int? CompanyID { get; set; }
     }
 }
